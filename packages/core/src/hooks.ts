@@ -1,31 +1,36 @@
-import type { Networkish } from '@ethersproject/networks'
-import type { BaseProvider, Web3Provider } from '@ethersproject/providers'
-import { createWeb3ReactStoreAndActions } from '@web3-react/store'
-import type { Actions, Connector, Web3ReactState, Web3ReactStore } from '@web3-react/types'
-import { useEffect, useMemo, useState } from 'react'
-import { useStore } from 'zustand'
-import { useStoreWithEqualityFn } from 'zustand/traditional'
+import type { Networkish } from "@ethersproject/networks";
+import type { BaseProvider, Web3Provider } from "@ethersproject/providers";
+import { createWeb3ReactStoreAndActions } from "@web3-react/store";
+import type {
+  Actions,
+  Connector,
+  Web3ReactState,
+  Web3ReactStore,
+} from "@web3-react/types";
+import { useEffect, useMemo, useState } from "react";
+import { useStore } from "zustand";
+import { useStoreWithEqualityFn } from "zustand/traditional";
 
-let DynamicProvider: typeof Web3Provider | null | undefined
+let DynamicProvider: typeof Web3Provider | null | undefined;
 async function importProvider(): Promise<void> {
   if (DynamicProvider === undefined) {
     try {
-      const { Web3Provider } = await import('@ethersproject/providers')
-      DynamicProvider = Web3Provider
+      const { Web3Provider } = await import("@ethersproject/providers");
+      DynamicProvider = Web3Provider;
     } catch {
-      console.debug('@ethersproject/providers not available')
-      DynamicProvider = null
+      console.debug("@ethersproject/providers not available");
+      DynamicProvider = null;
     }
   }
 }
 
 export type Web3ReactHooks = ReturnType<typeof getStateHooks> &
   ReturnType<typeof getDerivedHooks> &
-  ReturnType<typeof getAugmentedHooks>
+  ReturnType<typeof getAugmentedHooks>;
 
-export type Web3ReactSelectedHooks = ReturnType<typeof getSelectedConnector>
+export type Web3ReactSelectedHooks = ReturnType<typeof getSelectedConnector>;
 
-export type Web3ReactPriorityHooks = ReturnType<typeof getPriorityConnector>
+export type Web3ReactPriorityHooks = ReturnType<typeof getPriorityConnector>;
 
 /**
  * Wraps the initialization of a `connector`. Creates a zustand `store` with `actions` bound to it, and then passes
@@ -38,18 +43,26 @@ export type Web3ReactPriorityHooks = ReturnType<typeof getPriorityConnector>
 export function initializeConnector<T extends Connector>(
   f: (actions: Actions) => T
 ): [T, Web3ReactHooks, Web3ReactStore] {
-  const [store, actions] = createWeb3ReactStoreAndActions()
+  const [store, actions] = createWeb3ReactStoreAndActions();
 
-  const connector = f(actions)
-  const stateHooks = getStateHooks(store)
-  const derivedHooks = getDerivedHooks(stateHooks)
-  const augmentedHooks = getAugmentedHooks<T>(connector, stateHooks, derivedHooks)
+  const connector = f(actions);
+  const stateHooks = getStateHooks(store);
+  const derivedHooks = getDerivedHooks(stateHooks);
+  const augmentedHooks = getAugmentedHooks<T>(
+    connector,
+    stateHooks,
+    derivedHooks
+  );
 
-  return [connector, { ...stateHooks, ...derivedHooks, ...augmentedHooks }, store]
+  return [
+    connector,
+    { ...stateHooks, ...derivedHooks, ...augmentedHooks },
+    store,
+  ];
 }
 
 function computeIsActive({ chainId, accounts, activating }: Web3ReactState) {
-  return Boolean(chainId && accounts && !activating)
+  return Boolean(chainId && accounts && !activating);
 }
 
 /**
@@ -59,50 +72,64 @@ function computeIsActive({ chainId, accounts, activating }: Web3ReactState) {
  * @returns hooks - A variety of convenience hooks that wrap the hooks returned from initializeConnector.
  */
 export function getSelectedConnector(
-  ...initializedConnectors: [Connector, Web3ReactHooks][] | [Connector, Web3ReactHooks, Web3ReactStore][]
+  ...initializedConnectors:
+    | [Connector, Web3ReactHooks][]
+    | [Connector, Web3ReactHooks, Web3ReactStore][]
 ) {
   function getIndex(connector: Connector) {
-    const index = initializedConnectors.findIndex(([initializedConnector]) => connector === initializedConnector)
-    if (index === -1) throw new Error('Connector not found')
-    return index
+    const index = initializedConnectors.findIndex(
+      ([initializedConnector]) => connector === initializedConnector
+    );
+    if (index === -1) throw new Error("Connector not found");
+    return index;
   }
 
   function useSelectedStore(connector: Connector) {
-    const store = initializedConnectors[getIndex(connector)][2]
-    if (!store) throw new Error('Stores not passed')
-    return store
+    const store = initializedConnectors[getIndex(connector)][2];
+    if (!store) throw new Error("Stores not passed");
+    return store;
   }
 
   // the following code calls hooks in a map a lot, which violates the eslint rule.
   // this is ok, though, because initializedConnectors never changes, so the same hooks are called each time
   function useSelectedChainId(connector: Connector) {
     // eslint-disable-next-line react-hooks/rules-of-hooks
-    const values = initializedConnectors.map(([, { useChainId }]) => useChainId())
-    return values[getIndex(connector)]
+    const values = initializedConnectors.map(([, { useChainId }]) =>
+      useChainId()
+    );
+    return values[getIndex(connector)];
   }
 
   function useSelectedAccounts(connector: Connector) {
     // eslint-disable-next-line react-hooks/rules-of-hooks
-    const values = initializedConnectors.map(([, { useAccounts }]) => useAccounts())
-    return values[getIndex(connector)]
+    const values = initializedConnectors.map(([, { useAccounts }]) =>
+      useAccounts()
+    );
+    return values[getIndex(connector)];
   }
 
   function useSelectedIsActivating(connector: Connector) {
     // eslint-disable-next-line react-hooks/rules-of-hooks
-    const values = initializedConnectors.map(([, { useIsActivating }]) => useIsActivating())
-    return values[getIndex(connector)]
+    const values = initializedConnectors.map(([, { useIsActivating }]) =>
+      useIsActivating()
+    );
+    return values[getIndex(connector)];
   }
 
   function useSelectedAccount(connector: Connector) {
     // eslint-disable-next-line react-hooks/rules-of-hooks
-    const values = initializedConnectors.map(([, { useAccount }]) => useAccount())
-    return values[getIndex(connector)]
+    const values = initializedConnectors.map(([, { useAccount }]) =>
+      useAccount()
+    );
+    return values[getIndex(connector)];
   }
 
   function useSelectedIsActive(connector: Connector) {
     // eslint-disable-next-line react-hooks/rules-of-hooks
-    const values = initializedConnectors.map(([, { useIsActive }]) => useIsActive())
-    return values[getIndex(connector)]
+    const values = initializedConnectors.map(([, { useIsActive }]) =>
+      useIsActive()
+    );
+    return values[getIndex(connector)];
   }
 
   /**
@@ -114,26 +141,30 @@ export function getSelectedConnector(
     connector: Connector,
     network?: Networkish
   ): T | undefined {
-    const index = getIndex(connector)
+    const index = getIndex(connector);
     // eslint-disable-next-line react-hooks/rules-of-hooks
-    const values = initializedConnectors.map(([, { useProvider }], i) => useProvider<T>(network, i === index))
-    return values[index]
+    const values = initializedConnectors.map(([, { useProvider }], i) =>
+      useProvider<T>(network, i === index)
+    );
+    return values[index];
   }
 
   function useSelectedENSNames(connector: Connector, provider?: BaseProvider) {
-    const index = getIndex(connector)
+    const index = getIndex(connector);
     const values = initializedConnectors.map(([, { useENSNames }], i) =>
       // eslint-disable-next-line react-hooks/rules-of-hooks
       useENSNames(i === index ? provider : undefined)
-    )
-    return values[index]
+    );
+    return values[index];
   }
 
   function useSelectedENSName(connector: Connector, provider?: BaseProvider) {
-    const index = getIndex(connector)
+    const index = getIndex(connector);
     // eslint-disable-next-line react-hooks/rules-of-hooks
-    const values = initializedConnectors.map(([, { useENSName }], i) => useENSName(i === index ? provider : undefined))
-    return values[index]
+    const values = initializedConnectors.map(([, { useENSName }], i) =>
+      useENSName(i === index ? provider : undefined)
+    );
+    return values[index];
   }
 
   return {
@@ -146,7 +177,7 @@ export function getSelectedConnector(
     useSelectedProvider,
     useSelectedENSNames,
     useSelectedENSName,
-  }
+  };
 }
 
 /**
@@ -157,7 +188,9 @@ export function getSelectedConnector(
  * @returns hooks - A variety of convenience hooks that wrap the hooks returned from initializeConnector.
  */
 export function getPriorityConnector(
-  ...initializedConnectors: [Connector, Web3ReactHooks][] | [Connector, Web3ReactHooks, Web3ReactStore][]
+  ...initializedConnectors:
+    | [Connector, Web3ReactHooks][]
+    | [Connector, Web3ReactHooks, Web3ReactStore][]
 ) {
   const {
     useSelectedStore,
@@ -169,37 +202,39 @@ export function getPriorityConnector(
     useSelectedProvider,
     useSelectedENSNames,
     useSelectedENSName,
-  } = getSelectedConnector(...initializedConnectors)
+  } = getSelectedConnector(...initializedConnectors);
 
   function usePriorityConnector() {
     // eslint-disable-next-line react-hooks/rules-of-hooks
-    const values = initializedConnectors.map(([, { useIsActive }]) => useIsActive())
-    const index = values.findIndex((isActive) => isActive)
-    return initializedConnectors[index === -1 ? 0 : index][0]
+    const values = initializedConnectors.map(([, { useIsActive }]) =>
+      useIsActive()
+    );
+    const index = values.findIndex((isActive) => isActive);
+    return initializedConnectors[index === -1 ? 0 : index][0];
   }
 
   function usePriorityStore() {
-    return useSelectedStore(usePriorityConnector())
+    return useSelectedStore(usePriorityConnector());
   }
 
   function usePriorityChainId() {
-    return useSelectedChainId(usePriorityConnector())
+    return useSelectedChainId(usePriorityConnector());
   }
 
   function usePriorityAccounts() {
-    return useSelectedAccounts(usePriorityConnector())
+    return useSelectedAccounts(usePriorityConnector());
   }
 
   function usePriorityIsActivating() {
-    return useSelectedIsActivating(usePriorityConnector())
+    return useSelectedIsActivating(usePriorityConnector());
   }
 
   function usePriorityAccount() {
-    return useSelectedAccount(usePriorityConnector())
+    return useSelectedAccount(usePriorityConnector());
   }
 
   function usePriorityIsActive() {
-    return useSelectedIsActive(usePriorityConnector())
+    return useSelectedIsActive(usePriorityConnector());
   }
 
   /**
@@ -207,16 +242,18 @@ export function getPriorityConnector(
    * getPriorityConnector is using `connector.customProvider`, in which case it must match every possible type of this
    * property, over all connectors.
    */
-  function usePriorityProvider<T extends BaseProvider = Web3Provider>(network?: Networkish) {
-    return useSelectedProvider<T>(usePriorityConnector(), network)
+  function usePriorityProvider<T extends BaseProvider = Web3Provider>(
+    network?: Networkish
+  ) {
+    return useSelectedProvider<T>(usePriorityConnector(), network);
   }
 
   function usePriorityENSNames(provider?: BaseProvider) {
-    return useSelectedENSNames(usePriorityConnector(), provider)
+    return useSelectedENSNames(usePriorityConnector(), provider);
   }
 
   function usePriorityENSName(provider?: BaseProvider) {
-    return useSelectedENSName(usePriorityConnector(), provider)
+    return useSelectedENSName(usePriorityConnector(), provider);
   }
 
   return {
@@ -239,56 +276,60 @@ export function getPriorityConnector(
     usePriorityProvider,
     usePriorityENSNames,
     usePriorityENSName,
-  }
+  };
 }
 
-const CHAIN_ID = ({ chainId }: Web3ReactState) => chainId
-const ACCOUNTS = ({ accounts }: Web3ReactState) => accounts
-const ACTIVATING = ({ activating }: Web3ReactState) => activating
+const CHAIN_ID = ({ chainId }: Web3ReactState) => chainId;
+const ACCOUNTS = ({ accounts }: Web3ReactState) => accounts;
+const ACTIVATING = ({ activating }: Web3ReactState) => activating;
 
-const ACCOUNTS_EQUALITY_CHECKER: <T extends Web3ReactState['accounts']>(a: T, b: T) => boolean = (
-  oldAccounts,
-  newAccounts
-) =>
+const ACCOUNTS_EQUALITY_CHECKER: <T extends Web3ReactState["accounts"]>(
+  a: T,
+  b: T
+) => boolean = (oldAccounts, newAccounts) =>
   (oldAccounts === undefined && newAccounts === undefined) ||
   (oldAccounts !== undefined &&
     oldAccounts.length === newAccounts?.length &&
-    oldAccounts.every((oldAccount, i) => oldAccount === newAccounts[i]))
+    oldAccounts.every((oldAccount, i) => oldAccount === newAccounts[i]));
 
 function getStateHooks(store: Web3ReactStore) {
-  function useChainId(): Web3ReactState['chainId'] {
-    return useStore(store, CHAIN_ID)
+  function useChainId(): Web3ReactState["chainId"] {
+    return useStore(store, CHAIN_ID);
   }
 
-  function useAccounts(): Web3ReactState['accounts'] {
-    return useStoreWithEqualityFn(store, ACCOUNTS, ACCOUNTS_EQUALITY_CHECKER)
+  function useAccounts(): Web3ReactState["accounts"] {
+    return useStoreWithEqualityFn(store, ACCOUNTS, ACCOUNTS_EQUALITY_CHECKER);
   }
 
-  function useIsActivating(): Web3ReactState['activating'] {
-    return useStore(store, ACTIVATING)
+  function useIsActivating(): Web3ReactState["activating"] {
+    return useStore(store, ACTIVATING);
   }
 
-  return { useChainId, useAccounts, useIsActivating }
+  return { useChainId, useAccounts, useIsActivating };
 }
 
-function getDerivedHooks({ useChainId, useAccounts, useIsActivating }: ReturnType<typeof getStateHooks>) {
+function getDerivedHooks({
+  useChainId,
+  useAccounts,
+  useIsActivating,
+}: ReturnType<typeof getStateHooks>) {
   function useAccount(): string | undefined {
-    return useAccounts()?.[0]
+    return useAccounts()?.[0];
   }
 
   function useIsActive(): boolean {
-    const chainId = useChainId()
-    const accounts = useAccounts()
-    const activating = useIsActivating()
+    const chainId = useChainId();
+    const accounts = useAccounts();
+    const activating = useIsActivating();
 
     return computeIsActive({
       chainId,
       accounts,
       activating,
-    })
+    });
   }
 
-  return { useAccount, useIsActive }
+  return { useAccount, useIsActive };
 }
 
 /**
@@ -296,32 +337,35 @@ function getDerivedHooks({ useChainId, useAccounts, useIsActivating }: ReturnTyp
  * indicated that names cannot be fetched because there's no provider, or they're in the process of being fetched,
  * or `string | null`, depending on whether an ENS name has been set for the account in question or not.
  */
-function useENS(provider?: BaseProvider, accounts: string[] = []): undefined[] | (string | null)[] {
-  const [ENSNames, setENSNames] = useState<(string | null)[] | undefined>()
+function useENS(
+  provider?: BaseProvider,
+  accounts: string[] = []
+): undefined[] | (string | null)[] {
+  const [ENSNames, setENSNames] = useState<(string | null)[] | undefined>();
 
   useEffect(() => {
     if (provider && accounts.length) {
-      let stale = false
+      let stale = false;
 
       Promise.all(accounts.map((account) => provider.lookupAddress(account)))
         .then((ENSNames) => {
-          if (stale) return
-          setENSNames(ENSNames)
+          if (stale) return;
+          setENSNames(ENSNames);
         })
         .catch((error) => {
-          if (stale) return
-          console.debug('Could not fetch ENS names', error)
-          setENSNames(new Array<null>(accounts.length).fill(null))
-        })
+          if (stale) return;
+          console.debug("Could not fetch ENS names", error);
+          setENSNames(new Array<null>(accounts.length).fill(null));
+        });
 
       return () => {
-        stale = true
-        setENSNames(undefined)
-      }
+        stale = true;
+        setENSNames(undefined);
+      };
     }
-  }, [provider, accounts])
+  }, [provider, accounts]);
 
-  return ENSNames ?? new Array<undefined>(accounts.length).fill(undefined)
+  return ENSNames ?? new Array<undefined>(accounts.length).fill(undefined);
 }
 
 function getAugmentedHooks<T extends Connector>(
@@ -339,46 +383,57 @@ function getAugmentedHooks<T extends Connector>(
    * @typeParam T - A type argument must only be provided if using `connector.customProvider`, in which case it
    * must match the type of this property.
    */
-  function useProvider<T extends BaseProvider = Web3Provider>(network?: Networkish, enabled = true): T | undefined {
-    const isActive = useIsActive()
-    const chainId = useChainId()
+  function useProvider<T extends BaseProvider = Web3Provider>(
+    network?: Networkish,
+    enabled = true
+  ): T | undefined {
+    const isActive = useIsActive();
+    const chainId = useChainId();
 
     // ensure that Provider is going to be available when loaded if @ethersproject/providers is installed
-    const [loaded, setLoaded] = useState(DynamicProvider !== undefined)
+    const [loaded, setLoaded] = useState(DynamicProvider !== undefined);
     useEffect(() => {
-      if (loaded) return
-      let stale = false
+      if (loaded) return;
+      let stale = false;
       void importProvider().then(() => {
-        if (stale) return
-        setLoaded(true)
-      })
+        if (stale) return;
+        setLoaded(true);
+      });
       return () => {
-        stale = true
-      }
-    }, [loaded])
+        stale = true;
+      };
+    }, [loaded]);
 
     return useMemo(() => {
       // to ensure connectors remain fresh, we condition re-renders on loaded, isActive and chainId
-      void loaded && isActive && chainId
+      void loaded && isActive && chainId;
       if (enabled) {
-        if (connector.customProvider) return connector.customProvider as T
+        if (connector.customProvider) return connector.customProvider as T;
         // see tsdoc note above for return type explanation.
         else if (DynamicProvider && connector.provider)
-          return new DynamicProvider(connector.provider, network) as unknown as T
+          return new DynamicProvider(
+            connector.provider,
+            network
+          ) as unknown as T;
       }
-    }, [loaded, enabled, isActive, chainId, network])
+    }, [loaded, enabled, isActive, chainId, network]);
   }
 
-  function useENSNames(provider?: BaseProvider): undefined[] | (string | null)[] {
-    const accounts = useAccounts()
-    return useENS(provider, accounts)
+  function useENSNames(
+    provider?: BaseProvider
+  ): undefined[] | (string | null)[] {
+    const accounts = useAccounts();
+    return useENS(provider, accounts);
   }
 
   function useENSName(provider?: BaseProvider): undefined | string | null {
-    const account = useAccount()
-    const accounts = useMemo(() => (account === undefined ? undefined : [account]), [account])
-    return useENS(provider, accounts)?.[0]
+    const account = useAccount();
+    const accounts = useMemo(
+      () => (account === undefined ? undefined : [account]),
+      [account]
+    );
+    return useENS(provider, accounts)?.[0];
   }
 
-  return { useProvider, useENSNames, useENSName }
+  return { useProvider, useENSNames, useENSName };
 }

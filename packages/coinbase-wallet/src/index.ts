@@ -1,101 +1,113 @@
-import type { CoinbaseWalletProvider, CoinbaseWalletSDK } from '@coinbase/wallet-sdk'
+import type {
+  CoinbaseWalletProvider,
+  CoinbaseWalletSDK,
+} from "@coinbase/wallet-sdk";
 import type {
   Actions,
   AddEthereumChainParameter,
   ProviderConnectInfo,
   ProviderRpcError,
   WatchAssetParameters,
-} from '@web3-react/types'
-import { Connector } from '@web3-react/types'
+} from "@web3-react/types";
+import { Connector } from "@web3-react/types";
 
 function parseChainId(chainId: string | number) {
-  return typeof chainId === 'number' ? chainId : Number.parseInt(chainId, chainId.startsWith('0x') ? 16 : 10)
+  return typeof chainId === "number"
+    ? chainId
+    : Number.parseInt(chainId, chainId.startsWith("0x") ? 16 : 10);
 }
 
-type CoinbaseWalletSDKOptions = ConstructorParameters<typeof CoinbaseWalletSDK>[0] & { url: string }
+type CoinbaseWalletSDKOptions = ConstructorParameters<
+  typeof CoinbaseWalletSDK
+>[0] & { url: string };
 
 /**
  * @param options - Options to pass to `@coinbase/wallet-sdk`.
  * @param onError - Handler to report errors thrown from eventListeners.
  */
 export interface CoinbaseWalletConstructorArgs {
-  actions: Actions
-  options: CoinbaseWalletSDKOptions
-  onError?: (error: Error) => void
+  actions: Actions;
+  options: CoinbaseWalletSDKOptions;
+  onError?: (error: Error) => void;
 }
 
 export class CoinbaseWallet extends Connector {
   /** {@inheritdoc Connector.provider} */
-  public provider: CoinbaseWalletProvider | undefined
+  public provider: CoinbaseWalletProvider | undefined;
 
-  private readonly options: CoinbaseWalletSDKOptions
-  private eagerConnection?: Promise<void>
+  private readonly options: CoinbaseWalletSDKOptions;
+  private eagerConnection?: Promise<void>;
 
   /**
    * A `CoinbaseWalletSDK` instance.
    */
-  public coinbaseWallet: CoinbaseWalletSDK | undefined
+  public coinbaseWallet: CoinbaseWalletSDK | undefined;
 
   constructor({ actions, options, onError }: CoinbaseWalletConstructorArgs) {
-    super(actions, onError)
-    this.options = options
+    super(actions, onError);
+    this.options = options;
   }
 
   // the `connected` property, is bugged, but this works as a hack to check connection status
   private get connected() {
-    return !!this.provider?.selectedAddress
+    return !!this.provider?.selectedAddress;
   }
 
   private async isomorphicInitialize(): Promise<void> {
-    if (this.eagerConnection) return
+    if (this.eagerConnection) return;
 
-    await (this.eagerConnection = import('@coinbase/wallet-sdk').then((m) => {
-      const { url, ...options } = this.options
-      this.coinbaseWallet = new m.default(options)
-      this.provider = this.coinbaseWallet.makeWeb3Provider(url)
+    await (this.eagerConnection = import("@coinbase/wallet-sdk").then((m) => {
+      const { url, ...options } = this.options;
+      this.coinbaseWallet = new m.default(options);
+      this.provider = this.coinbaseWallet.makeWeb3Provider(url);
 
-      this.provider.on('connect', ({ chainId }: ProviderConnectInfo): void => {
-        this.actions.update({ chainId: parseChainId(chainId) })
-      })
+      this.provider.on("connect", ({ chainId }: ProviderConnectInfo): void => {
+        this.actions.update({ chainId: parseChainId(chainId) });
+      });
 
-      this.provider.on('disconnect', (error: ProviderRpcError): void => {
-        this.actions.resetState()
-        this.onError?.(error)
-      })
+      this.provider.on("disconnect", (error: ProviderRpcError): void => {
+        this.actions.resetState();
+        this.onError?.(error);
+      });
 
-      this.provider.on('chainChanged', (chainId: string): void => {
-        this.actions.update({ chainId: parseChainId(chainId) })
-      })
+      this.provider.on("chainChanged", (chainId: string): void => {
+        this.actions.update({ chainId: parseChainId(chainId) });
+      });
 
-      this.provider.on('accountsChanged', (accounts: string[]): void => {
+      this.provider.on("accountsChanged", (accounts: string[]): void => {
         if (accounts.length === 0) {
           // handle this edge case by disconnecting
-          this.actions.resetState()
+          this.actions.resetState();
         } else {
-          this.actions.update({ accounts })
+          this.actions.update({ accounts });
         }
-      })
-    }))
+      });
+    }));
   }
 
   /** {@inheritdoc Connector.connectEagerly} */
   public async connectEagerly(): Promise<void> {
-    const cancelActivation = this.actions.startActivation()
+    const cancelActivation = this.actions.startActivation();
 
     try {
-      await this.isomorphicInitialize()
+      await this.isomorphicInitialize();
 
-      if (!this.provider || !this.connected) throw new Error('No existing connection')
+      if (!this.provider || !this.connected)
+        throw new Error("No existing connection");
 
       // Wallets may resolve eth_chainId and hang on eth_accounts pending user interaction, which may include changing
       // chains; they should be requested serially, with accounts first, so that the chainId can settle.
-      const accounts = await this.provider.request<string[]>({ method: 'eth_accounts' })
-      if (!accounts.length) throw new Error('No accounts returned')
-      const chainId = await this.provider.request<string>({ method: 'eth_chainId' })
-      this.actions.update({ chainId: parseChainId(chainId), accounts })
+      const accounts = await this.provider.request<string[]>({
+        method: "eth_accounts",
+      });
+      if (!accounts.length) throw new Error("No accounts returned");
+      const chainId = await this.provider.request<string>({
+        method: "eth_chainId",
+      });
+      this.actions.update({ chainId: parseChainId(chainId), accounts });
     } catch (error) {
-      cancelActivation()
-      throw error
+      cancelActivation();
+      throw error;
     }
   }
 
@@ -108,78 +120,104 @@ export class CoinbaseWallet extends Connector {
    * AddEthereumChainParameter, in which case the user will be prompted to add the chain with the specified parameters
    * first, before being prompted to switch.
    */
-  public async activate(desiredChainIdOrChainParameters?: number | AddEthereumChainParameter): Promise<void> {
+  public async activate(
+    desiredChainIdOrChainParameters?: number | AddEthereumChainParameter
+  ): Promise<void> {
     const desiredChainId =
-      typeof desiredChainIdOrChainParameters === 'number'
+      typeof desiredChainIdOrChainParameters === "number"
         ? desiredChainIdOrChainParameters
-        : desiredChainIdOrChainParameters?.chainId
+        : desiredChainIdOrChainParameters?.chainId;
 
     if (this.provider && this.connected) {
-      if (!desiredChainId || desiredChainId === parseChainId(this.provider.chainId)) return
+      if (
+        !desiredChainId ||
+        desiredChainId === parseChainId(this.provider.chainId)
+      )
+        return;
 
-      const desiredChainIdHex = `0x${desiredChainId.toString(16)}`
+      const desiredChainIdHex = `0x${desiredChainId.toString(16)}`;
       return this.provider
         .request<void>({
-          method: 'wallet_switchEthereumChain',
+          method: "wallet_switchEthereumChain",
           params: [{ chainId: desiredChainIdHex }],
         })
         .catch(async (error: ProviderRpcError) => {
-          if (error.code === 4902 && typeof desiredChainIdOrChainParameters !== 'number') {
-            if (!this.provider) throw new Error('No provider')
+          if (
+            error.code === 4902 &&
+            typeof desiredChainIdOrChainParameters !== "number"
+          ) {
+            if (!this.provider) throw new Error("No provider");
             // if we're here, we can try to add a new network
             return this.provider.request<void>({
-              method: 'wallet_addEthereumChain',
-              params: [{ ...desiredChainIdOrChainParameters, chainId: desiredChainIdHex }],
-            })
+              method: "wallet_addEthereumChain",
+              params: [
+                {
+                  ...desiredChainIdOrChainParameters,
+                  chainId: desiredChainIdHex,
+                },
+              ],
+            });
           }
 
-          throw error
-        })
+          throw error;
+        });
     }
 
-    const cancelActivation = this.actions.startActivation()
+    const cancelActivation = this.actions.startActivation();
 
     try {
-      await this.isomorphicInitialize()
-      if (!this.provider) throw new Error('No provider')
+      await this.isomorphicInitialize();
+      if (!this.provider) throw new Error("No provider");
 
       // Wallets may resolve eth_chainId and hang on eth_accounts pending user interaction, which may include changing
       // chains; they should be requested serially, with accounts first, so that the chainId can settle.
-      const accounts = await this.provider.request<string[]>({ method: 'eth_requestAccounts' })
-      const chainId = await this.provider.request<string>({ method: 'eth_chainId' })
-      const receivedChainId = parseChainId(chainId)
+      const accounts = await this.provider.request<string[]>({
+        method: "eth_requestAccounts",
+      });
+      const chainId = await this.provider.request<string>({
+        method: "eth_chainId",
+      });
+      const receivedChainId = parseChainId(chainId);
 
       if (!desiredChainId || desiredChainId === receivedChainId)
-        return this.actions.update({ chainId: receivedChainId, accounts })
+        return this.actions.update({ chainId: receivedChainId, accounts });
 
       // if we're here, we can try to switch networks
-      const desiredChainIdHex = `0x${desiredChainId.toString(16)}`
+      const desiredChainIdHex = `0x${desiredChainId.toString(16)}`;
       return this.provider
         ?.request<void>({
-          method: 'wallet_switchEthereumChain',
+          method: "wallet_switchEthereumChain",
           params: [{ chainId: desiredChainIdHex }],
         })
         .catch(async (error: ProviderRpcError) => {
-          if (error.code === 4902 && typeof desiredChainIdOrChainParameters !== 'number') {
-            if (!this.provider) throw new Error('No provider')
+          if (
+            error.code === 4902 &&
+            typeof desiredChainIdOrChainParameters !== "number"
+          ) {
+            if (!this.provider) throw new Error("No provider");
             // if we're here, we can try to add a new network
             return this.provider.request<void>({
-              method: 'wallet_addEthereumChain',
-              params: [{ ...desiredChainIdOrChainParameters, chainId: desiredChainIdHex }],
-            })
+              method: "wallet_addEthereumChain",
+              params: [
+                {
+                  ...desiredChainIdOrChainParameters,
+                  chainId: desiredChainIdHex,
+                },
+              ],
+            });
           }
 
-          throw error
-        })
+          throw error;
+        });
     } catch (error) {
-      cancelActivation()
-      throw error
+      cancelActivation();
+      throw error;
     }
   }
 
   /** {@inheritdoc Connector.deactivate} */
   public deactivate(): void {
-    this.coinbaseWallet?.disconnect()
+    this.coinbaseWallet?.disconnect();
   }
 
   public async watchAsset({
@@ -187,14 +225,15 @@ export class CoinbaseWallet extends Connector {
     symbol,
     decimals,
     image,
-  }: Pick<WatchAssetParameters, 'address'> & Partial<Omit<WatchAssetParameters, 'address'>>): Promise<true> {
-    if (!this.provider) throw new Error('No provider')
+  }: Pick<WatchAssetParameters, "address"> &
+    Partial<Omit<WatchAssetParameters, "address">>): Promise<true> {
+    if (!this.provider) throw new Error("No provider");
 
     return this.provider
       .request({
-        method: 'wallet_watchAsset',
+        method: "wallet_watchAsset",
         params: {
-          type: 'ERC20',
+          type: "ERC20",
           options: {
             address, // The address that the token is at.
             symbol, // A ticker symbol or shorthand, up to 5 chars.
@@ -204,8 +243,8 @@ export class CoinbaseWallet extends Connector {
         },
       })
       .then((success) => {
-        if (!success) throw new Error('Rejected')
-        return true
-      })
+        if (!success) throw new Error("Rejected");
+        return true;
+      });
   }
 }
